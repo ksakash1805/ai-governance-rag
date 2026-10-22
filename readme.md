@@ -1,6 +1,9 @@
 # Enterprise AI Governance & DPDP Compliance Copilot (Hybrid RAG)
 
-An enterprise Retrieval-Augmented Generation (RAG) system that answers legal, privacy, and LLM security compliance questions strictly grounded in authoritative public regulatory frameworks, with page-level inline citations, hybrid search (ChromaDB + BM25 Reciprocal Rank Fusion), Langfuse observability, and an automated LLM-as-a-Judge evaluation suite.
+**Live Demo:** [https://ai-governance-rag.onrender.com](https://ai-governance-rag.onrender.com)  
+**GitHub Repository:** [https://github.com/ksakash1805/ai-governance-rag](https://github.com/ksakash1805/ai-governance-rag)
+
+An enterprise Retrieval-Augmented Generation (RAG) system that answers legal, privacy, and LLM security compliance questions strictly grounded in authoritative public regulatory frameworks, with page-level inline citations, hybrid search (ChromaDB ONNX + BM25 Reciprocal Rank Fusion), Langfuse observability, and an automated LLM-as-a-Judge evaluation suite.
 
 ## Authoritative Document Corpus (176 Content-Rich Pages)
 
@@ -17,11 +20,11 @@ An enterprise Retrieval-Augmented Generation (RAG) system that answers legal, pr
 | :--- | :--- | :--- |
 | **Document Parsing** | `PyMuPDF` (`fitz`) | Extracts page-level text while preserving `doc_id`, `page_number`, and direct PDF URLs for `#page=X` deep linking |
 | **Contextual Chunking** | Sentence-Aware Splitter (900 chars, 150-char overlap) | Prepends `[Source: {doc_title} ({doc_id}) \| Page {page_number}]` to every chunk so cross-framework queries retain document identity |
-| **Dense Embeddings** | `sentence-transformers` (`BAAI/bge-small-en-v1.5`) | Local 384-dimensional CPU embeddings for semantic similarity without external embedding API latency or cost |
+| **Dense Embeddings** | `ChromaDB` ONNX Runtime (`all-MiniLM-L6-v2`) | Local 384-dimensional CPU embeddings via ONNX Runtime (~180 MB RAM footprint, fitting inside free 512 MB cloud containers without heavy PyTorch dependencies) |
 | **Hybrid Retrieval** | `ChromaDB` (Cosine) + `rank-bm25` (`BM25Okapi`) | Merges Top-20 semantic candidates and Top-20 keyword candidates via Reciprocal Rank Fusion ($k=60$) with a per-document diversity cap (`max_per_doc=4`, `top_k=6`) |
 | **LLM Generation** | [Groq Cloud API](https://console.groq.com/docs/models) (`openai/gpt-oss-120b`) | Enforces strict `[DOC_ID, Page X]` inline citations at `temperature=0.1` and refuses out-of-scope questions |
 | **Observability** | [Langfuse Cloud](https://langfuse.com/docs/observability/sdk/instrumentation) (`@observe` SDK) | Captures nested traces for hybrid retrieval, prompt templates, token usage, and latency |
-| **Web API & Hosting** | `Flask` + `flask-cors` on [Hugging Face Spaces](https://huggingface.co/spaces) (Docker) | Serves a responsive dark-mode compliance UI and REST endpoint (`/api/chat`) inside a free 16 GB RAM container |
+| **Web API & Hosting** | `Flask` + `gunicorn` on [Render Free Tier](https://render.com/docs/deploy-flask) | Serves a responsive dark-mode compliance UI and REST endpoint (`/api/chat`) deployed continuously from GitHub |
 
 ## Iterative Error Analysis Improved Citation Compliance by 50 Percentage Points
 
@@ -39,19 +42,19 @@ We evaluated the pipeline on an 8-question Golden Benchmark (`eval/run_eval.py`)
 * **Eliminating Multi-Document Source Crowding:** On cross-framework queries combining India's DPDP Act and OWASP LLM Top 10, naive Top-5 retrieval filled all 5 slots with `INDIA-DPDP-2023` chunks due to dense keyword repetition. Adding a per-document diversity cap ensured balanced retrieval across both frameworks while reducing prompt tokens.
 * **Balancing Diversity Against Table Contiguity:** An overly strict `max_per_doc=2` cap truncated multi-chunk penalty tables on Page 21 of the DPDP Act (`Q1_DPDP_PENALTY`). Tuning to `top_k=6, max_per_doc=4` preserved full multi-chunk tables for single-document queries while reserving 2 context slots for multi-document queries.
 * **Resolving Reasoning Model Token Truncation & Unicode Drift:** Inspecting `eval/eval_results.json` revealed that `openai/gpt-oss-120b` consumed small `max_tokens` budgets on internal chain-of-thought reasoning and emitted Unicode non-breaking hyphens (`\u2011`) inside `[NIST-AI-100-1, Page X]` tags. Expanding the token budget and adding deterministic Unicode normalization restored citation verification.
+* **Optimizing Container Memory via ONNX Runtime:** Replacing PyTorch (`sentence-transformers`, ~800 MB RAM) with ChromaDB's native ONNX Runtime embedding function reduced memory usage to ~180 MB, enabling zero-cost deployment on Render's 512 MB Free Tier.
 
 ## Repository Structure
 
 ```text
 ai-governance-rag/
 ├── app.py                     # Flask REST API (/api/chat, /api/health) & web server
-├── Dockerfile                 # Hugging Face Spaces container configuration (Port 7860)
-├── requirements.txt           # Pinned Python dependencies
+├── requirements.txt           # Lean production Python dependencies (ONNX-backed)
 ├── data/
 │   ├── raw/                   # Official PDFs (DPDP 2023, NIST AI RMF, NIST GenAI, OWASP 2025)
 │   ├── processed_pages.json   # Extracted page-level text and metadata (176 pages)
 │   ├── chunks.json            # Contextualized overlapping chunks for BM25
-│   └── chroma_db/             # Persistent ChromaDB vector store (bge-small-en-v1.5)
+│   └── chroma_db/             # Persistent ChromaDB vector store
 ├── src/
 │   ├── ingest.py              # Automated PDF downloader and PyMuPDF extractor
 │   ├── indexer.py             # Contextual chunker & HybridRetriever (Chroma + BM25 + RRF)
@@ -67,7 +70,7 @@ ai-governance-rag/
 
 1. **Clone the repository and install dependencies:**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/ai-governance-rag.git
+   git clone https://github.com/ksakash1805/ai-governance-rag.git
    cd ai-governance-rag
    python -m venv venv
    source venv/bin/activate  # On Windows PowerShell: .\venv\Scripts\Activate.ps1
@@ -93,14 +96,14 @@ ai-governance-rag/
 
 ## Embedding in Your Portfolio Website
 
-Once deployed to Hugging Face Spaces (`https://YOUR-USERNAME-ai-governance-rag.hf.space`), paste this snippet into any section of your portfolio website (`index.html` or React component):
+Paste this snippet into any section of your portfolio website (`index.html` or React component) to embed the live Render deployment:
 
 ```html
 <section style="max-width: 960px; margin: 2rem auto;">
   <h2>Live Demo: Enterprise AI Governance & DPDP Compliance Copilot</h2>
   <p>Hybrid RAG (ChromaDB + BM25 + RRF) grounded in India's DPDP Act 2023, NIST AI RMF, and OWASP LLM Top 10.</p>
   <iframe
-    src="https://YOUR-USERNAME-ai-governance-rag.hf.space"
+    src="https://ai-governance-rag.onrender.com"
     width="100%"
     height="640"
     style="border: 1px solid #334155; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.35);"
