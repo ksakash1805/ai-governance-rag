@@ -1,0 +1,9 @@
+pymupdf
+chromadb
+rank-bm25
+groq
+langfuse
+flask
+flask-cors
+python-dotenv
+gunicorn

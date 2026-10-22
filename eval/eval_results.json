@@ -1,0 +1,119 @@
+{
+  "total_questions": 8,
+  "retrieval_hit_rate_pct": 100.0,
+  "citation_compliance_pct": 75.0,
+  "faithfulness_correctness_pct": 75.0,
+  "avg_latency_sec": 8.39,
+  "details": [
+    {
+      "id": "Q1_DPDP_PENALTY",
+      "question": "What is the maximum penalty under India's DPDP Act for failing to take reasonable security safeguards to prevent a personal data breach?",
+      "latency_sec": 1.68,
+      "retrieval_hit": 1.0,
+      "citation_valid": 0.0,
+      "judge_score": 0.0,
+      "judge_reason": "The answer does not provide the penalty information and fails to address the question.",
+      "retrieved_docs": [
+        "INDIA-DPDP-2023"
+      ],
+      "answer_preview": "I cannot verify this from the indexed governance frameworks...."
+    },
+    {
+      "id": "Q2_DPDP_CHILDREN",
+      "question": "What are the obligations of a Data Fiduciary before processing personal data of a child under India's DPDP Act?",
+      "latency_sec": 2.06,
+      "retrieval_hit": 1.0,
+      "citation_valid": 1.0,
+      "judge_score": 0.5,
+      "judge_reason": "Mentions consent correctly but omits the prohibition on harmful processing and adds unrelated obligations",
+      "retrieved_docs": [
+        "INDIA-DPDP-2023"
+      ],
+      "answer_preview": "**Obligations of a Data Fiduciary before processing personal data of a child**  - **Obtain verifiable parental or guardian consent** - the Data Fiduciary must secure verifiable consent from the child's parent or lawful g..."
+    },
+    {
+      "id": "Q3_NIST_RMF_CORE",
+      "question": "What are the four core functions of the NIST AI Risk Management Framework (AI RMF 1.0)?",
+      "latency_sec": 1.22,
+      "retrieval_hit": 1.0,
+      "citation_valid": 1.0,
+      "judge_score": 1.0,
+      "judge_reason": "The answer correctly lists all four core functions (GOVERN, MAP, MEASURE, MANAGE) matching the ground truth and adds accurate descriptions without fabrications.",
+      "retrieved_docs": [
+        "NIST-AI-100-1",
+        "NIST-AI-600-1"
+      ],
+      "answer_preview": "- **GOVERN** - the cross-cutting function that informs and is infused throughout all AI risk-management activities [NIST-AI-100-1, Page 25]   - **MAP** - the function that helps organizations understand the AI system, it..."
+    },
+    {
+      "id": "Q4_NIST_GENAI_CONFABULATION",
+      "question": "How does the NIST Generative AI Profile (AI 600-1) define confabulation and what risks does it pose?",
+      "latency_sec": 1.87,
+      "retrieval_hit": 1.0,
+      "citation_valid": 0.0,
+      "judge_score": 1.0,
+      "judge_reason": "Provides the correct definition and includes the stated risks, adding accurate but extra details without contradicting the ground truth",
+      "retrieved_docs": [
+        "NIST-AI-100-1",
+        "NIST-AI-600-1"
+      ],
+      "answer_preview": "- **Definition** - The NIST Generative AI Profile (AI 600-1) defines *confabulation* as the phenomenon where a generative-AI system \"generates and confidently presents erroneous or false content in response to prompts…in..."
+    },
+    {
+      "id": "Q5_OWASP_PROMPT_INJECTION",
+      "question": "What is Prompt Injection according to OWASP Top 10 for LLM Applications 2025 and what is the difference between direct and indirect prompt injection?",
+      "latency_sec": 18.59,
+      "retrieval_hit": 1.0,
+      "citation_valid": 1.0,
+      "judge_score": 1.0,
+      "judge_reason": "The answer accurately defines Prompt Injection and correctly distinguishes direct from indirect injection, matching the ground truth without hallucinations.",
+      "retrieved_docs": [
+        "OWASP-LLM-2025",
+        "NIST-AI-600-1"
+      ],
+      "answer_preview": "**Prompt Injection (OWASP Top 10 for LLM Applications 2025)**   - A Prompt Injection vulnerability occurs when an attacker supplies crafted input that causes a Large Language Model (LLM) to behave in unintended or unexpe..."
+    },
+    {
+      "id": "Q6_OWASP_VECTOR_RAG",
+      "question": "What are Vector and Embedding Weaknesses in OWASP LLM Top 10 2025 and how can they be mitigated in RAG systems?",
+      "latency_sec": 12.38,
+      "retrieval_hit": 1.0,
+      "citation_valid": 1.0,
+      "judge_score": 1.0,
+      "judge_reason": "The answer accurately covers the described weaknesses and includes the required mitigations, adding relevant details without contradicting the ground truth.",
+      "retrieved_docs": [
+        "OWASP-LLM-2025"
+      ],
+      "answer_preview": "**Vector and Embedding Weaknesses (OWASP LLM Top 10 2025 - LLM08:2025)**    - **What the weakness is** - Vulnerabilities arise in the way vectors and embeddings are **generated, stored, or retrieved** in Retrieval-Augmen..."
+    },
+    {
+      "id": "Q7_CROSS_FRAMEWORK",
+      "question": "If an organization faces a personal data breach in an LLM system in India, what are the breach notification duties under the DPDP Act and how does OWASP LLM Top 10 address Sensitive Information Disclosure?",
+      "latency_sec": 17.34,
+      "retrieval_hit": 1.0,
+      "citation_valid": 1.0,
+      "judge_score": 0.5,
+      "judge_reason": "Correctly states DPDP breach notification duties, but only partially covers OWASP mitigation, missing explicit input/output filtering guidance",
+      "retrieved_docs": [
+        "OWASP-LLM-2025",
+        "INDIA-DPDP-2023"
+      ],
+      "answer_preview": "**DPDP Act - Breach-notification duties in India**  - The Data Fiduciary must **inform the Data Protection Board and every affected Data Principal** of a personal-data breach, using the form and manner prescribed by the ..."
+    },
+    {
+      "id": "Q8_OUT_OF_SCOPE_GUARDRAIL",
+      "question": "What is the standard corporate income tax rate for manufacturing companies in Brazil in 2026?",
+      "latency_sec": 11.98,
+      "retrieval_hit": 1.0,
+      "citation_valid": 1.0,
+      "judge_score": 1.0,
+      "judge_reason": "The response correctly refuses to answer and cites inability to verify from indexed governance frameworks, matching the ground truth.",
+      "retrieved_docs": [
+        "NIST-AI-100-1",
+        "OWASP-LLM-2025",
+        "INDIA-DPDP-2023"
+      ],
+      "answer_preview": "I cannot verify this from the indexed governance frameworks...."
+    }
+  ]
+}
