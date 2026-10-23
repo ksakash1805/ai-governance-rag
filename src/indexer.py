@@ -1,19 +1,15 @@
 ﻿import os
 import re
+import math
 import json
-import chromadb
-from chromadb.utils import embedding_functions
+from collections import Counter
 from rank_bm25 import BM25Okapi
 
 PAGES_JSON = os.path.join("data", "processed_pages.json")
 CHUNKS_JSON = os.path.join("data", "chunks.json")
-CHROMA_DIR = os.path.join("data", "chroma_db")
-COLLECTION_NAME = "ai_governance_docs"
-EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 
 
 def chunk_text(text: str, max_chars: int = 900, overlap: int = 150) -> list[str]:
-    # Split on paragraph or sentence boundaries
     sentences = re.split(r"(?<=[.!?])\s+|\n\n+", text)
     chunks = []
     current = ""
@@ -27,10 +23,8 @@ def chunk_text(text: str, max_chars: int = 900, overlap: int = 150) -> list[str]
         else:
             if current:
                 chunks.append(current)
-            # Start new chunk with tail overlap from previous chunk
             tail = current[-overlap:] if len(current) > overlap else current
             current = f"{tail} {sent}".strip()
-            # If a single sentence is huge, hard-slice it
             while len(current) > max_chars:
                 chunks.append(current[:max_chars])
                 current = current[max_chars - overlap:]
@@ -41,6 +35,11 @@ def chunk_text(text: str, max_chars: int = 900, overlap: int = 150) -> list[str]
 
 
 def build_chunks():
+    if not os.path.exists(PAGES_JSON):
+        from ingest import download_pdfs, extract_pages
+        download_pdfs()
+        extract_pages()
+
     with open(PAGES_JSON, "r", encoding="utf-8") as f:
         pages = json.load(f)
 
@@ -62,6 +61,7 @@ def build_chunks():
                 "text": enriched_text
             })
 
+    os.makedirs("data", exist_ok=True)
     with open(CHUNKS_JSON, "w", encoding="utf-8") as f:
         json.dump(all_chunks, f, indent=2, ensure_ascii=False)
 
@@ -69,58 +69,60 @@ def build_chunks():
     return all_chunks
 
 
-def build_vector_index(chunks: list[dict]):
-    print(f"[EMBEDDING] Loading local model '{EMBED_MODEL}' (first run downloads ~130MB)...")
-    ef = embedding_functions.DefaultEmbeddingFunction()
-    client = chromadb.PersistentClient(path=CHROMA_DIR)
-
-    # Reset collection if re-running so we don't duplicate chunks
-    try:
-        client.delete_collection(COLLECTION_NAME)
-    except Exception:
-        pass
-
-    collection = client.create_collection(
-        name=COLLECTION_NAME,
-        embedding_function=ef,
-        metadata={"hnsw:space": "cosine"}
-    )
-
-    batch_size = 100
-    for i in range(0, len(chunks), batch_size):
-        batch = chunks[i : i + batch_size]
-        collection.add(
-            ids=[c["chunk_id"] for c in batch],
-            documents=[c["text"] for c in batch],
-            metadatas=[{
-                "doc_id": c["doc_id"],
-                "doc_title": c["doc_title"],
-                "page_number": c["page_number"],
-                "source_url": c["source_url"]
-            } for c in batch]
-        )
-        print(f"  -> Indexed {min(i + batch_size, len(chunks))}/{len(chunks)} chunks into ChromaDB")
-
-    print(f"[SUCCESS] Vector index saved to {CHROMA_DIR}")
+def tokenize_with_stems(text: str) -> list[str]:
+    words = re.findall(r"[a-z0-9]+", text.lower())
+    # Include 5-char prefixes to capture morphological variants (e.g. consent/consenting, penalty/penalties)
+    stems = [w[:5] for w in words if len(w) > 5]
+    return words + stems
 
 
 class HybridRetriever:
     def __init__(self):
+        if not os.path.exists(CHUNKS_JSON):
+            build_chunks()
         with open(CHUNKS_JSON, "r", encoding="utf-8") as f:
             self.chunks = json.load(f)
         self.chunk_map = {c["chunk_id"]: c for c in self.chunks}
 
+        # 1. Build BM25 Keyword Index
         tokenized_corpus = [re.findall(r"\w+", c["text"].lower()) for c in self.chunks]
         self.bm25 = BM25Okapi(tokenized_corpus)
 
-        ef = embedding_functions.DefaultEmbeddingFunction()
-        client = chromadb.PersistentClient(path=CHROMA_DIR)
-        self.collection = client.get_collection(name=COLLECTION_NAME, embedding_function=ef)
+        # 2. Build Lightweight TF-IDF Vector Index (~5 MB RAM instead of 500+ MB)
+        self.doc_tokens = [tokenize_with_stems(c["text"]) for c in self.chunks]
+        df = Counter()
+        for toks in self.doc_tokens:
+            for t in set(toks):
+                df[t] += 1
+        n_docs = len(self.chunks)
+        self.idf = {t: math.log((n_docs + 1) / (freq + 1)) + 1.0 for t, freq in df.items()}
+
+        self.doc_vecs = []
+        for toks in self.doc_tokens:
+            tf = Counter(toks)
+            vec = {t: (count / len(toks)) * self.idf.get(t, 1.0) for t, count in tf.items()}
+            norm = math.sqrt(sum(v * v for v in vec.values())) or 1.0
+            self.doc_vecs.append({t: v / norm for t, v in vec.items()})
+
+    def _vector_search(self, query: str, top_n: int = 20) -> list[str]:
+        q_toks = tokenize_with_stems(query)
+        if not q_toks:
+            return [c["chunk_id"] for c in self.chunks[:top_n]]
+        tf = Counter(q_toks)
+        q_vec = {t: (count / len(q_toks)) * self.idf.get(t, 1.0) for t, count in tf.items()}
+        q_norm = math.sqrt(sum(v * v for v in q_vec.values())) or 1.0
+        q_vec = {t: v / q_norm for t, v in q_vec.items()}
+
+        scores = []
+        for idx, d_vec in enumerate(self.doc_vecs):
+            dot = sum(q_val * d_vec.get(t, 0.0) for t, q_val in q_vec.items())
+            scores.append((dot, self.chunks[idx]["chunk_id"]))
+        scores.sort(key=lambda x: x[0], reverse=True)
+        return [cid for _, cid in scores[:top_n]]
 
     def retrieve(self, query: str, top_k: int = 6, max_per_doc: int = 4) -> list[dict]:
-        # 1. Dense Vector Search (Top 20 candidates)
-        vec_res = self.collection.query(query_texts=[query], n_results=20)
-        vec_ids = vec_res["ids"][0]
+        # 1. Vector Cosine Search (Top 20 candidates)
+        vec_ids = self._vector_search(query, top_n=20)
 
         # 2. Sparse BM25 Keyword Search (Top 20 candidates)
         tokens = re.findall(r"\w+", query.lower())
@@ -138,7 +140,7 @@ class HybridRetriever:
 
         ranked_ids = sorted(rrf_scores.keys(), key=lambda cid: rrf_scores[cid], reverse=True)
 
-        # 4. Document-Diverse Selection (prevents one document from crowding out others)
+        # 4. Document-Diverse Selection
         results = []
         doc_counts = {}
         for cid in ranked_ids:
@@ -156,13 +158,8 @@ class HybridRetriever:
 
 
 if __name__ == "__main__":
-    chunks_data = build_chunks()
-    build_vector_index(chunks_data)
-
-    print("\n--- Testing Hybrid Retriever ---")
+    build_chunks()
     retriever = HybridRetriever()
-    test_query = "What is the maximum penalty for a personal data breach under India's DPDP Act?"
-    top_chunks = retriever.retrieve(test_query, top_k=3)
-    for idx, res in enumerate(top_chunks, 1):
-        print(f"\nResult #{idx} (RRF Score: {res['rrf_score']}) | {res['doc_id']} Page {res['page_number']}:")
-        print(res["text"][:300] + "...")
+    res = retriever.retrieve("What does the DPDP Act say about consent?", top_k=3)
+    for r in res:
+        print(f"Matched: {r['doc_id']} Page {r['page_number']} (RRF: {r['rrf_score']})")
